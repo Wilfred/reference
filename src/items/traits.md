@@ -64,36 +64,48 @@ trait Seq<T> {
 
 ## Object Safety
 
-Object safe traits can be the base trait of a [trait object]. A trait is
-*object safe* if it has the following qualities (defined in [RFC 255]):
+An object safe trait can be the base trait of a [trait object], i.e. `dyn
+MyTrait` is permitted.
 
-* All [supertraits] must also be object safe.
-* `Sized` must not be a [supertrait][supertraits]. In other words, it must not require `Self: Sized`.
+A trait is *object safe* if it can be used as a [dynamically sized
+type]. Specifically, a trait is object safe if it has the following properties
+(defined in [RFC 255]):
+
+* `Sized` must not be a [supertrait][supertraits], i.e. the trait must not
+  require `Self: Sized`. This is necessary because `dyn MyTrait` implements
+  `MyTrait` (see [RFC 546]).
+* All associated functions must be object safe.
 * It must not have any associated constants.
 * It must not have any associated types with generics.
-* All associated functions must either be dispatchable from a trait object or be explicitly non-dispatchable:
-    * Dispatchable functions must:
-        * Not have any type parameters (although lifetime parameters are allowed).
-        * Be a [method] that does not use `Self` except in the type of the receiver.
-        * Have a receiver with one of the following types:
-            * `&Self` (i.e. `&self`)
-            * `&mut Self` (i.e `&mut self`)
-            * [`Box<Self>`]
-            * [`Rc<Self>`]
-            * [`Arc<Self>`]
-            * [`Pin<P>`] where `P` is one of the types above
-        * Not have an opaque return type; that is,
-            * Not be an `async fn` (which has a hidden `Future` type).
-            * Not have a return position `impl Trait` type (`fn example(&self) -> impl Trait`).
-        * Not have a `where Self: Sized` bound (receiver type of `Self` (i.e. `self`) implies this).
-    * Explicitly non-dispatchable functions require:
-        * Have a `where Self: Sized` bound (receiver type of `Self` (i.e. `self`) implies this).
+* All [supertraits] must also be object safe.
+
+An associated function is object safe if is dispatchable from a trait object, or
+it is explicitly non-dispatchable.
+
+Dispatchable functions must:
+
+* Not have any type parameters (although lifetime parameters are allowed).
+* Be a [method] that does not use `Self` except in the type of the receiver.
+* Have a receiver with one of the following types:
+    * `&Self` (i.e. `&self`)
+    * `&mut Self` (i.e `&mut self`)
+    * [`Box<Self>`]
+    * [`Rc<Self>`]
+    * [`Arc<Self>`]
+    * [`Pin<P>`] where `P` is one of the types above
+* Not have an opaque return type; that is,
+    * Not be an `async fn` (which has a hidden `Future` type).
+    * Not have a return position `impl Trait` type (`fn example(&self) -> impl Trait`).
+* Not have a `where Self: Sized` bound (a receiver type of `Self` implies this).
+
+Explicitly non-dispatchable functions require a `where Self: Sized` bound. This
+is implied if the receiver type is `Self`.
 
 ```rust
 # use std::rc::Rc;
 # use std::sync::Arc;
 # use std::pin::Pin;
-// Examples of object safe methods.
+// All these methods are object safe, so this trait can be used in a trait object.
 trait TraitMethods {
     fn by_ref(self: &Self) {}
     fn by_ref_mut(self: &mut Self) {}
@@ -110,7 +122,7 @@ trait TraitMethods {
 ```
 
 ```rust,compile_fail
-// This trait is object-safe, but these methods cannot be dispatched on a trait object.
+// This trait is object safe, but these methods cannot be dispatched on a trait object.
 trait NonDispatchable {
     // Non-methods cannot be dispatched.
     fn foo() where Self: Sized {}
@@ -134,7 +146,7 @@ obj.typed(1);  // ERROR: cannot call with generic type
 
 ```rust,compile_fail
 # use std::rc::Rc;
-// Examples of non-object safe traits.
+// Examples of traits that are not object safe.
 trait NotObjectSafe {
     const CONST: i32 = 1;  // ERROR: cannot have associated const
 
@@ -152,7 +164,7 @@ let obj: Box<dyn NotObjectSafe> = Box::new(S); // ERROR
 ```
 
 ```rust,compile_fail
-// Self: Sized traits are not object-safe.
+// Self: Sized traits are not object safe.
 trait TraitWithSize where Self: Sized {}
 
 struct S;
@@ -328,6 +340,7 @@ fn main() {
 [bounds]: ../trait-bounds.md
 [trait object]: ../types/trait-object.md
 [RFC 255]: https://github.com/rust-lang/rfcs/blob/master/text/0255-object-safety.md
+[RFC 546]: https://github.com/rust-lang/rfcs/blob/master/text/0546-Self-not-sized-by-default.md
 [associated items]: associated-items.md
 [method]: associated-items.md#methods
 [supertraits]: #supertraits
@@ -337,6 +350,7 @@ fn main() {
 [generic functions]: functions.md#generic-functions
 [unsafe]: ../unsafety.md
 [trait implementation]: implementations.md#trait-implementations
+[dynamically sized type]: ../dynamically-sized-types.md
 [`Send`]: ../special-types-and-traits.md#send
 [`Sync`]: ../special-types-and-traits.md#sync
 [`Arc<Self>`]: ../special-types-and-traits.md#arct
